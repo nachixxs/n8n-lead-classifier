@@ -1,0 +1,303 @@
+{
+  "name": "Clasificador de Leads Inmobiliarios",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead",
+        "responseMode": "onReceived",
+        "responseData": "allEntries"
+      },
+      "id": "node-webhook-001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "lead-classifier-webhook"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "field-nombre",
+              "name": "nombre",
+              "value": "={{ $json.body.nombre }}",
+              "type": "string"
+            },
+            {
+              "id": "field-mensaje",
+              "name": "mensaje",
+              "value": "={{ $json.body.mensaje }}",
+              "type": "string"
+            },
+            {
+              "id": "field-presupuesto",
+              "name": "presupuesto",
+              "value": "={{ $json.body.presupuesto ?? '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-set-estructurar-002",
+      "name": "Set: Estructurar datos",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "claude-haiku-4-5-20251001"
+            },
+            {
+              "name": "max_tokens",
+              "value": "={{ 10 }}"
+            },
+            {
+              "name": "messages",
+              "value": "={{ [{\"role\":\"user\",\"content\":\"Sos un clasificador de leads inmobiliarios.\\nClasificá el siguiente lead como FRIO, TIBIO o CALIENTE.\\n\\nCRITERIOS:\\nCALIENTE: presupuesto definido, urgencia clara, pregunta específica.\\nTIBIO: interés real pero sin urgencia o presupuesto vago.\\nFRIO: solo curiosidad, sin intención de compra.\\n\\nRespondé SOLO con una palabra: CALIENTE, TIBIO o FRIO.\\n\\nLead: \"+$json.mensaje+\"\\nPresupuesto: \"+$json.presupuesto}] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-http-claude-003",
+      "name": "HTTP Request: Claude API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_CREDENTIAL_ID",
+          "name": "Claude API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "parse-nombre",
+              "name": "nombre",
+              "value": "={{ $('Set: Estructurar datos').item.json.nombre }}",
+              "type": "string"
+            },
+            {
+              "id": "parse-mensaje",
+              "name": "mensaje",
+              "value": "={{ $('Set: Estructurar datos').item.json.mensaje }}",
+              "type": "string"
+            },
+            {
+              "id": "parse-presupuesto",
+              "name": "presupuesto",
+              "value": "={{ $('Set: Estructurar datos').item.json.presupuesto }}",
+              "type": "string"
+            },
+            {
+              "id": "parse-clasificacion",
+              "name": "clasificacion",
+              "value": "={{ $json.content[0].text.trim().toUpperCase() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-set-parsear-004",
+      "name": "Set: Parsear respuesta",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.clasificacion }}",
+        "rules": {
+          "rules": [
+            {
+              "operation": "equal",
+              "value2": "CALIENTE"
+            },
+            {
+              "operation": "equal",
+              "value2": "TIBIO"
+            },
+            {
+              "operation": "equal",
+              "value2": "FRIO"
+            }
+          ]
+        }
+      },
+      "id": "node-switch-routing-005",
+      "name": "Switch: Routing",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "sendTo": "ignacionogpa@gmail.com",
+        "subject": "🔥 Lead CALIENTE: {{ $json.nombre }}",
+        "emailType": "text",
+        "message": "Lead CALIENTE recibido en el sistema de clasificación.\n\nNombre: {{ $json.nombre }}\nMensaje: {{ $json.mensaje }}\nPresupuesto: {{ $json.presupuesto }}\n\n¡Contactar de inmediato!",
+        "options": {}
+      },
+      "id": "node-gmail-caliente-006",
+      "name": "Gmail: Alert CALIENTE",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1340, 140],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "node-sheets-tibio-007",
+      "name": "Google Sheets: Guardar TIBIO",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [1340, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "node-noop-frio-008",
+      "name": "No Operation: FRIO",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1340, 460]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Set: Estructurar datos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set: Estructurar datos": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request: Claude API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request: Claude API": {
+      "main": [
+        [
+          {
+            "node": "Set: Parsear respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set: Parsear respuesta": {
+      "main": [
+        [
+          {
+            "node": "Switch: Routing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch: Routing": {
+      "main": [
+        [
+          {
+            "node": "Gmail: Alert CALIENTE",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Google Sheets: Guardar TIBIO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation: FRIO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "id": "lead-classifier-v1",
+  "meta": {
+    "instanceId": "local"
+  }
+}
