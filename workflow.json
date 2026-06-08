@@ -162,9 +162,9 @@
     {
       "parameters": {
         "sendTo": "ignacionogpa@gmail.com",
-        "subject": "='🔥 Lead CALIENTE: ' + $json.nombre",
+        "subject": "=🔥 Lead CALIENTE: {{ $json.nombre }}",
         "emailType": "text",
-        "message": "='Lead CALIENTE recibido en el sistema de clasificación.\\n\\nNombre: ' + $json.nombre + '\\nMensaje: ' + $json.mensaje + '\\nPresupuesto: ' + $json.presupuesto + '\\n\\n¡Contactar de inmediato!'",
+        "message": "=Lead CALIENTE recibido.\n\nNombre: {{ $json.nombre }}\nMensaje: {{ $json.mensaje }}\nPresupuesto: {{ $json.presupuesto }}\n\n¡Contactar de inmediato!",
         "options": {}
       },
       "id": "node-gmail-caliente-006",
